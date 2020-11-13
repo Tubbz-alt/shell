@@ -516,9 +516,11 @@ export class Ext extends Ecs.System<ExtEvent> {
     }
 
     exception_select() {
-        log.debug('select a window plz')
-        overview.show()
-        this.exception_selecting = true;
+        GLib.idle_add(GLib.PRIORITY_LOW, () => {
+            this.exception_selecting = true
+            overview.show()
+            return false
+        })
     }
 
     exit_modes() {
@@ -653,7 +655,7 @@ export class Ext extends Ecs.System<ExtEvent> {
         this.size_signals_unblock(win);
 
         if (this.exception_selecting) {
-            this.exception_add(win);
+            this.exception_add(win)
         }
 
         // Keep the last-focused window from being shifted too quickly. 300ms debounce
