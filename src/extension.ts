@@ -1664,6 +1664,14 @@ export class Ext extends Ecs.System<ExtEvent> {
         this.workspace_by_id(id)?.activate(global.get_current_time());
     }
 
+    start_launcher_services() {
+        this.window_search.start_services()
+    }
+
+    stop_launcher_services() {
+        this.window_search.stop_services()
+    }
+
     tab_list(tablist: number, workspace: Meta.Workspace | null): Array<Window.ShellWindow> {
         const windows = display.get_tab_list(tablist, workspace);
 
@@ -2080,6 +2088,7 @@ function enable() {
     }
 
     ext.signals_attach();
+    ext.start_launcher_services()
 
     layoutManager.addChrome(ext.overlay);
 
@@ -2108,7 +2117,7 @@ function disable() {
 
         ext.signals_remove();
         ext.exit_modes();
-
+        ext.stop_launcher_services();
         ext.hide_all_borders();
 
         layoutManager.removeChrome(ext.overlay);

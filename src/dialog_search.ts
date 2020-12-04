@@ -2,6 +2,7 @@
 const Me = imports.misc.extensionUtils.getCurrentExtension();
 
 import * as Lib from 'lib';
+import { SearchOption } from './launcher';
 
 const { Clutter, St } = imports.gi;
 const { ModalDialog } = imports.ui.modalDialog;
@@ -16,30 +17,29 @@ export class Search {
     });
 
     private active_id: number;
-    private mode_prefixes: Array<string>;
     private entry: St.Entry;
     private list: St.Widget;
     private text: Clutter.Text;
     private widgets: Array<St.Widget>;
 
-    private apply_cb: (text: string, index: number) => boolean;
+    private apply_cb: (index: number) => boolean;
     private cancel_cb: () => void;
+    private complete_cb: () => void;
     private select_cb: (id: number) => void;
 
     constructor(
-        mode_prefixes: Array<string>,
         cancel: () => void,
-        search: (pattern: string) => Array<St.Widget> | null,
+        search: (pattern: string) => Array<SearchOption> | null,
+        complete: () => void,
         select: (id: number) => void,
-        apply: (text: string, index: number) => boolean,
-        mode: (id: number) => void,
+        apply: (index: number) => boolean,
     ) {
         this.apply_cb = apply;
         this.cancel_cb = cancel;
+        this.complete_cb = complete;
         this.select_cb = select;
 
         this.active_id = 0;
-        this.mode_prefixes = mode_prefixes;
         this.widgets = [];
 
         this.entry = new St.Entry({
@@ -55,15 +55,8 @@ export class Search {
         this.text.connect("text-changed", (entry: any) => {
             this.clear();
 
-            const text = (entry as Clutter.Text).get_text().trim();
-
-            let prefix = this.has_prefix(text);
-            mode(prefix);
-
-            const update = search((prefix === -1) ? text.toLowerCase() : text);
-            if (update) {
-                this.update_search_list(update);
-            }
+            const update = search((entry as Clutter.Text).get_text().trim())
+            if (update) this.update_search_list(update)
         });
 
         this.text.connect("key-press-event", (_: any, event: any) => {
@@ -73,12 +66,14 @@ export class Search {
             }
 
             let c = event.get_key_symbol();
-            if (c == 65307) {
+            if (c === 65307) {
                 // Escape key was pressed
                 this.reset();
                 this.close();
                 cancel();
                 return;
+            } else if (c === 65289) {
+                this.complete_cb()
             }
 
             let s = event.get_state();
@@ -116,7 +111,7 @@ export class Search {
     }
 
     activate_option(id: number) {
-        const cont = this.apply_cb(this.get_text(), id);
+        const cont = this.apply_cb(id);
 
         if (!cont) {
             this.reset();
@@ -177,20 +172,20 @@ export class Search {
         );
     }
 
-    update_search_list(list: Array<St.Widget>) {
+    update_search_list(list: Array<SearchOption>) {
         Lib.join(
             list.values(),
-            (button: St.Widget) => {
+            (option: SearchOption) => {
                 const id = this.widgets.length;
 
-                button.connect('clicked', () => this.activate_option(id))
-                button.connect('notify::hover', () => {
+                option.widget.connect('clicked', () => this.activate_option(id))
+                option.widget.connect('notify::hover', () => {
                     this.select_id(id)
                     this.select_cb(id)
                 })
 
-                this.widgets.push(button);
-                this.list.add(button);
+                this.widgets.push(option.widget);
+                this.list.add(option.widget);
 
             },
             () => this.list.add(Lib.separator())
@@ -205,9 +200,5 @@ export class Search {
 
     set_text(text: string) {
         this.text.set_text(text);
-    }
-
-    private has_prefix(text: string): number {
-        return this.mode_prefixes.findIndex((p) => text.startsWith(p));
     }
 }
